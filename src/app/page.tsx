@@ -7,9 +7,10 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+  const [editError, setEditError] = useState("");
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");  
+  const [editingTitle, setEditingTitle] = useState("");
 
   const getTasks = async () => {
     try {
@@ -89,10 +90,11 @@ export default function Home() {
     setEditingId(null);
     setEditingTitle("");
     setError("");
+    setEditError("");
   };
 
   const saveEdit = async (id: number) => {
-    setError("");
+    setEditError("");
     try {
       const res = await fetch("/api/tasks", {
         method: "PUT",
@@ -101,14 +103,14 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
+        setEditError(data.error || "Something went wrong");
         return;
       }
       setEditingId(null);
       setEditingTitle("");
       getTasks();
     } catch {
-      setError("Failed to update task");
+      setEditError("Failed to update task");
     }
   };
 
@@ -143,9 +145,7 @@ export default function Home() {
       </div>
 
       {/* Error Message */}
-      {error && (
-        <p className="text-red-500 text-sm mb-4">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       {/* Task List */}
       <ul className="space-y-2 mt-4">
@@ -164,19 +164,28 @@ export default function Home() {
 
             {/* Title or Edit Input */}
             {editingId === task.id ? (
-              <input
-                type="text"
-                value={editingTitle}
-                onChange={(e) => setEditingTitle(e.target.value)}
-                className="flex-1 border rounded px-2 py-1 text-sm"
-                autoFocus
-              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  className="flex-1 border rounded px-2 py-1 text-sm"
+                  autoFocus
+                />
+                {editError && (
+                  <p className="text-red-500 text-xs mt-1">{editError}</p> // ← แสดง error ใต้ input
+                )}
+              </div>
             ) : (
-              <span className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}>
-                <span className={task.done ? "line-through" : ""}>{task.title}</span> {task.done ? "(Completed)" : "(Pending)"}
+              <span
+                className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}
+              >
+                <span className={task.done ? "line-through" : ""}>
+                  {task.title}
+                </span>{" "}
+                {task.done ? "(Completed)" : "(Pending)"}
               </span>
             )}
-
             {/* Buttons */}
             {editingId === task.id ? (
               <>
