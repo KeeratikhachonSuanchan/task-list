@@ -1,69 +1,144 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type Task = {
-  id: number;
-  title: string;
-  done: boolean;
-  created_at: string;
-};
+import type { Task } from "@/lib/schema";
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const fetchTasks = async () => {
-    const res = await fetch("/api/tasks");
-    const data = await res.json();
-    setTasks(data);
+  const getTasks = async () => {
+    try {
+      const res = await fetch("/api/tasks");
+      const data = await res.json();
+      setTasks(data);
+    } catch {
+      setError("Failed to load tasks");
+    }
   };
 
   const addTask = async () => {
-    if (!title.trim()) return;
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
-    setTitle("");
-    fetchTasks();
+    setError("");
+
+    if (!title.trim()) {
+      setError("Please enter a task title");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        return;
+      }
+
+      setTitle("");
+      getTasks();
+    } catch {
+      setError("Failed to connect to server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleDone = async (id: number, done: boolean) => {
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, done: !done }),
+      });
+      getTasks();
+    } catch {
+      setError("Failed to update task");
+    }
+  };
+
+  const deleteTask = async (id: number) => {
+    try {
+      await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      getTasks();
+    } catch {
+      setError("Failed to delete task");
+    }
   };
 
   useEffect(() => {
-    fetchTasks();
+    getTasks();
   }, []);
 
   return (
     <main className="max-w-md mx-auto mt-10 p-6">
-      <h1 className="text-2xl font-bold mb-6">My Task List</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">My Task List</h1>
 
       {/* Add Task */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-2">
         <input
           type="text"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setError("");
+          }}
           onKeyDown={(e) => e.key === "Enter" && addTask()}
           placeholder="Add a new task..."
           className="flex-1 border rounded-lg px-4 py-2 text-sm"
         />
         <button
           onClick={addTask}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-500"
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-500 disabled:opacity-50"
         >
-          Add
+          {loading ? "Adding..." : "Add"}
         </button>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <p className="text-red-500 text-sm mb-4">{error}</p>
+      )}
+
       {/* Task List */}
-      <ul className="space-y-2">
+      <ul className="space-y-2 mt-4">
         {tasks.map((task) => (
           <li
             key={task.id}
             className="flex items-center gap-3 border rounded-lg px-4 py-3 text-sm"
           >
-            <span>{task.title}</span>
+            {/* Checkbox */}
+            <input
+              type="checkbox"
+              checked={task.done}
+              onChange={() => toggleDone(task.id, task.done)}
+              className="w-4 h-4 cursor-pointer"
+            />
+
+            {/* Title */}
+            <span className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}>
+              <span className={task.done ? "line-through" : ""}>{task.title}</span> {task.done ? "(Completed)" : "(Pending)"}
+            </span>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => deleteTask(task.id)}
+              className="text-red-400 hover:text-red-600 hover:font-bold text-xs cursor-pointer"
+            >
+              Delete
+            </button>
           </li>
         ))}
       </ul>
