@@ -103,3 +103,57 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const { id, title } = await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!title || typeof title !== "string") {
+      return NextResponse.json(
+        { error: "Title is required" },
+        { status: 400 }
+      );
+    }
+
+    if (title.trim().length < 2) {
+      return NextResponse.json(
+        { error: "Title must be at least 2 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (title.trim().length > 100) {
+      return NextResponse.json(
+        { error: "Title must not exceed 100 characters" },
+        { status: 400 }
+      );
+    }
+
+    const [task] = await db
+      .update(tasks)
+      .set({ title: title.trim() })
+      .where(eq(tasks.id, id))
+      .returning();
+
+    if (!task) {
+      return NextResponse.json(
+        { error: "Task not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(task);
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to update task" },
+      { status: 500 }
+    );
+  }
+}

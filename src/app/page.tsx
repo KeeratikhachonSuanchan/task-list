@@ -8,6 +8,8 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");  
 
   const getTasks = async () => {
     try {
@@ -77,6 +79,39 @@ export default function Home() {
     }
   };
 
+  const startEdit = (task: Task) => {
+    setEditingId(task.id);
+    setEditingTitle(task.title);
+    setError("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingTitle("");
+    setError("");
+  };
+
+  const saveEdit = async (id: number) => {
+    setError("");
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, title: editingTitle }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+        return;
+      }
+      setEditingId(null);
+      setEditingTitle("");
+      getTasks();
+    } catch {
+      setError("Failed to update task");
+    }
+  };
+
   useEffect(() => {
     getTasks();
   }, []);
@@ -127,18 +162,53 @@ export default function Home() {
               className="w-4 h-4 cursor-pointer"
             />
 
-            {/* Title */}
-            <span className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}>
-              <span className={task.done ? "line-through" : ""}>{task.title}</span> {task.done ? "(Completed)" : "(Pending)"}
-            </span>
+            {/* Title or Edit Input */}
+            {editingId === task.id ? (
+              <input
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                className="flex-1 border rounded px-2 py-1 text-sm"
+                autoFocus
+              />
+            ) : (
+              <span className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}>
+                <span className={task.done ? "line-through" : ""}>{task.title}</span> {task.done ? "(Completed)" : "(Pending)"}
+              </span>
+            )}
 
-            {/* Delete Button */}
-            <button
-              onClick={() => deleteTask(task.id)}
-              className="text-red-400 hover:text-red-600 hover:font-bold text-xs cursor-pointer"
-            >
-              Delete
-            </button>
+            {/* Buttons */}
+            {editingId === task.id ? (
+              <>
+                <button
+                  onClick={() => saveEdit(task.id)}
+                  className="text-green-500 hover:text-green-700 hover:font-bold text-xs cursor-pointer"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  className="text-gray-400 hover:text-gray-600 text-xs"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => startEdit(task)}
+                  className="text-blue-400 hover:text-blue-600 hover:font-bold text-xs cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="text-red-400 hover:text-red-600 hover:font-bold text-xs cursor-pointer"
+                >
+                  Delete
+                </button>
+              </>
+            )}
           </li>
         ))}
       </ul>
