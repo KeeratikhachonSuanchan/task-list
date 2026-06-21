@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Task List App
 
-## Getting Started
+## Which auth approach you chose and why
+- ใช้ Clerk เพราะว่า สะดวกและสามารถ setup ได้เร็ว มี UI สำเร็จรูปไม่ต้องทำหน้า Login เอง และรองรับ Next.js App Router เหมาะสำหรับผู้เริ่มต้น
 
-First, run the development server:
+## What is protected vs. public in your app
+- **Protected:** GET/POST/PATCH/PUT/DELETE /api/tasks — ต้อง Login ถึงจะทำงานได้
+- **Public:** หน้า Home แสดงได้โดยไม่ต้อง Login
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Per-user Data
+แต่ละ user เห็นแค่ tasks ของตัวเอง โดยเก็บ userId จาก Clerk ไว้ในทุก task
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Which migration/seed tooling you used and the exact commands to run them
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Migration & Seed Tooling
+ใช้ **Drizzle Kit** สำหรับ migration และ **tsx** สำหรับรัน seed/rollback script
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Migration
+npx drizzle-kit generate
+npx drizzle-kit migrate
+ถ้า 'npx drizzle-kit migrate' แล้ว Database ไม่เปลี่ยนแปลง ใช้ 'npx drizzle-kit push'
 
-## Learn More
+### Rollback
+npx tsx src/lib/rollback.ts
 
-To learn more about Next.js, take a look at the following resources:
+### Seed
+npx tsx src/lib/seed.ts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## How to Run Locally
+1. Clone repo
+2. Create .env.local and Add value example in example.env
+3. Run 'npm install && npm run dev'

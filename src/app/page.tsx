@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Task } from "@/lib/schema";
+import { useAuth } from "@clerk/nextjs";
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -11,14 +12,27 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const { userId, sessionClaims } = useAuth();
+  const role = (sessionClaims?.metadata as {role?: string })?.role;
+  const isAdmin = role === "admin";
 
   const getTasks = async () => {
+    setLoadingTasks(true);
     try {
       const res = await fetch("/api/tasks");
+
+      if (!res.ok) {
+      setTasks([]);
+      return;
+    }
+
       const data = await res.json();
       setTasks(data);
     } catch {
       setError("Failed to load tasks");
+    } finally {
+      setLoadingTasks(false);
     }
   };
 
@@ -115,112 +129,136 @@ export default function Home() {
   };
 
   useEffect(() => {
-    getTasks();
-  }, []);
+    if (userId) { // When login.
+      getTasks(); 
+    } else { // When logout or Not login yet.
+      setTasks([]);
+      setLoadingTasks(false);
+    }
+  }, [userId]);
 
   return (
-    <main className="w-lg mx-auto mt-10 p-6">
-      <h1 className="text-2xl font-bold mb-6 text-center">My Task List</h1>
+    <main className="max-w-3xl mx-auto mt-6 md:mt-10 p-4 md:p-6">
+      <h1 className="text-xl md:text-2xl font-bold mb-6 text-center">{isAdmin ? "All Task List" : "My Task List"} </h1>
 
       {/* Add Task */}
-      <div className="flex gap-2 mb-2">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setError("");
-          }}
-          onKeyDown={(e) => e.key === "Enter" && addTask()}
-          placeholder="Add a new task..."
-          className="flex-1 border rounded-lg px-4 py-2 text-sm"
-        />
-        <button
-          onClick={addTask}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-500 disabled:opacity-50"
-        >
-          {loading ? "Adding..." : "Add"}
-        </button>
-      </div>
+      {!isAdmin && (
+        <div className="flex gap-2 mb-2">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            placeholder="Add a new task..."
+            className="flex-1 border rounded-lg px-4 py-2 text-sm"
+          />
+          <button
+            onClick={addTask}
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-500 disabled:opacity-50"
+          >
+            {loading ? "Adding..." : "Add"}
+          </button>
+        </div>
+      )}
+      
 
       {/* Error Message */}
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       {/* Task List */}
-      <ul className="space-y-2 mt-4">
-        {tasks.map((task) => (
-          <li
-            key={task.id}
-            className="flex items-center gap-3 border rounded-lg px-4 py-3 text-sm"
-          >
-            {/* Checkbox */}
-            <input
-              type="checkbox"
-              checked={task.done}
-              onChange={() => toggleDone(task.id, task.done)}
-              className="w-4 h-4 cursor-pointer"
-            />
-
-            {/* Title or Edit Input */}
-            {editingId === task.id ? (
-              <div className="flex-1">
+      {loadingTasks ? (
+        // Loading state
+        <div className="text-center py-10 text-gray-400 text-sm">
+          Loading tasks...
+        </div>
+      ) : tasks.length === 0 ? (
+        // Empty state
+        <div className="text-center py-10 text-gray-400 text-sm">
+          No tasks yet — add one above!
+        </div>
+      ) : (
+        <ul className="space-y-2 mt-4">
+          {tasks.map((task) => (
+            <li
+              key={task.id}
+              className="flex items-center gap-3 border rounded-lg px-3 py-2 md:px-4 md:py-3 text-xs md:text-sm"
+            >
+              {/* Checkbox */}
+              {!isAdmin && (
                 <input
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  className="flex-1 border rounded px-2 py-1 text-sm"
-                  autoFocus
+                  type="checkbox"
+                  checked={task.done}
+                  onChange={() => toggleDone(task.id, task.done)}
+                  className="w-4 h-4 cursor-pointer"
                 />
-                {editError && (
-                  <p className="text-red-500 text-xs mt-1">{editError}</p> // ← แสดง error ใต้ input
-                )}
-              </div>
-            ) : (
-              <span
-                className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}
-              >
-                <span className={task.done ? "line-through" : ""}>
-                  {task.title}
-                </span>{" "}
-                {task.done ? "(Completed)" : "(Pending)"}
-              </span>
-            )}
-            {/* Buttons */}
-            {editingId === task.id ? (
-              <>
-                <button
-                  onClick={() => saveEdit(task.id)}
-                  className="text-green-500 hover:text-green-700 hover:font-bold text-xs cursor-pointer"
+              )}
+
+              {/* Title or Edit Input */}
+              {editingId === task.id ? (
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className="flex-1 border rounded px-2 py-1 text-sm"
+                    autoFocus
+                  />
+                  {editError && (
+                    <p className="text-red-500 text-xs mt-1">{editError}</p>
+                  )}
+                </div>
+              ) : (
+                <span
+                  className={`flex-1 ${task.done ? "text-green-500" : "text-yellow-500"}`}
                 >
-                  Save
-                </button>
-                <button
-                  onClick={cancelEdit}
-                  className="text-gray-400 hover:text-gray-600 text-xs"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => startEdit(task)}
-                  className="text-blue-400 hover:text-blue-600 hover:font-bold text-xs cursor-pointer"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="text-red-400 hover:text-red-600 hover:font-bold text-xs cursor-pointer"
-                >
-                  Delete
-                </button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+                  <span className={task.done ? "line-through" : ""}>
+                    {task.title}
+                  </span>{" "}
+                  {task.done ? "(Completed)" : "(Pending)"}
+                </span>
+              )}
+              {/* Buttons */}
+              {!isAdmin && (
+                editingId === task.id ? (
+                  <>
+                    <button
+                      onClick={() => saveEdit(task.id)}
+                      className="text-green-500 hover:text-green-700 hover:font-bold text-xs cursor-pointer"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startEdit(task)}
+                      className="text-blue-400 hover:text-blue-600 hover:font-bold text-xs cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="text-red-400 hover:text-red-600 hover:font-bold text-xs cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }

@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { tasks } from "@/lib/schema";
-import { eq } from "drizzle-orm";
-
+import { and, eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 export async function GET() {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized, Please login first." }, { status: 401 });
+  }
+  const role = (sessionClaims?.metadata as {role?: string })?.role;
+  console.log("User Role:", role);
   try {
-    const tasks = await db.query.tasks.findMany({
+    if (role === "admin") {
+      const allTasks = await db.query.tasks.findMany({
+        orderBy: (tasks, { desc }) => [desc(tasks.createdAt)],
+      });
+      return NextResponse.json(allTasks);
+    }
+    const userTasks = await db.query.tasks.findMany({
+      where: eq(tasks.userId, userId),
       orderBy: (tasks, { desc }) => [desc(tasks.createdAt)],
     });
-    return NextResponse.json(tasks);
-  } catch (error) {
+    return NextResponse.json(userTasks);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch tasks" },
       { status: 500 }
@@ -19,6 +32,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized, Please login first." }, { status: 401 });
+  }
   try {
     const { title } = await request.json();
 
@@ -43,9 +60,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const [task] = await db.insert(tasks).values({ title: title.trim() }).returning();
+    const [task] = await db.insert(tasks).values({ userId,title: title.trim() }).returning();
     return NextResponse.json(task, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to create task" },
       { status: 500 }
@@ -54,6 +71,10 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized, Please login first." }, { status: 401 });
+  }
   try {
     const { id, done } = await request.json();
 
@@ -64,7 +85,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const [task] = await db.update(tasks).set({ done }).where(eq(tasks.id, id)).returning();
+    const [task] = await db.update(tasks).set({ done }).where(and(eq(tasks.id, id), eq(tasks.userId, userId))).returning();
 
     if (!task) {
       return NextResponse.json(
@@ -83,6 +104,10 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized, Please login first." }, { status: 401 });
+  }
   try {
     const { id } = await request.json();
 
@@ -93,7 +118,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await db.delete(tasks).where(eq(tasks.id, id));
+    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
 
     return NextResponse.json({ success: true });
   } catch {
@@ -105,6 +130,10 @@ export async function DELETE(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized, Please login first." }, { status: 401 });
+  }
   try {
     const { id, title } = await request.json();
 
@@ -139,7 +168,7 @@ export async function PUT(request: Request) {
     const [task] = await db
       .update(tasks)
       .set({ title: title.trim() })
-      .where(eq(tasks.id, id))
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
       .returning();
 
     if (!task) {
